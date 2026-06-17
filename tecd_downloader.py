@@ -267,8 +267,12 @@ def main():
 
 
 if __name__ == "__main__":
+    hf_token = ""
+    with open("HF_TOKEN.txt", "r") as myfile:
+        for text in myfile:
+            hf_token += text
     download_dataset(
-    token="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",
+    token=hf_token,
     dataset_path="dataset/small",
     local_dir="CausalNBR/data/t_ecd_small/retail",
     domains=["retail"],
