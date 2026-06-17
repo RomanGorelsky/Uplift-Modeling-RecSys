@@ -329,15 +329,6 @@ class Evaluator():
             print('measure:"' + measure + '" is not supported! ')
 
     def _compute_dir_at_k(self, df, k, min_items=3, re_sort='no'):
-        """
-        DIR@K - Debiased Incremental Response at K
-        
-        Parameters:
-        - df: DataFrame already sorted by ranking column
-        - k: number of top items to consider
-        - min_items: minimum items per user to include
-        - re_sort: if True, re-sort by colname_estimate (for bounds)
-        """
         df['propensity_estimate'] = df['propensity_estimate'].clip(0.01, 0.99)  # Avoid extreme propensities
 
         df['causal_effect_estimate'] = df['outcome'] * \
@@ -367,10 +358,6 @@ class Evaluator():
         return metric, coverage
 
     def _compute_rcau_at_k(self, df, k):
-        """
-        Rank-Completeness Adjusted Uplift
-        Downweights users based on missing items in top-K
-        """
         def rcau_per_user(group):
             n_items = len(group)
             actual_k = min(k, n_items)
