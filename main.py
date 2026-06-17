@@ -70,9 +70,26 @@ flag = parser.parse_args()
 def main(flag=flag):
     # for phi_t in [0.1, 0.2, 0.3]:
     #     for th in [0.5, 0.6, 0.7]:
+    # for b in [1, 2, 5, 10, 20, 50]:
 
-    flag.prop_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1]+ '/'
-    flag.rec_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1]+ '/' + flag.rec_type + '/'
+    if flag.dataset == "t-ecd-small-short-r":
+        flag.prop_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1] + '/short/' 
+        if flag.rec_type != 'rel':
+            flag.rec_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1] + '/' + flag.rec_type + '/short/'
+        else:
+            flag.rec_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1] + '/orig/short/'
+    elif flag.dataset == "t-ecd-small-long-r":
+        flag.prop_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1] + '/long/'
+        if flag.rec_type != 'rel':
+            flag.rec_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1] + '/' + flag.rec_type + '/long/'
+        else:
+            flag.rec_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1] + '/orig/long/'
+    else:
+        flag.prop_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1] + '/'
+        if flag.rec_type != 'rel':
+            flag.rec_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1] + '/' + flag.rec_type + '/'
+        else:
+            flag.rec_add = flag.add + '/' + flag.prop_type + '/' + flag.dataset[-1] + '/orig/'
 
     cp10list_pred = []
     cp100list_pred = []
@@ -167,16 +184,19 @@ def main(flag=flag):
                 opt_add = 0.5
                 # opt_epsilon = 0.7
                 # opt_c = 0.8
-            if flag.dataset == 't-ecd-small-m':
-                opt_scale = 0.1
-                opt_add = 0.0
-                # opt_epsilon = 0.7
-                # opt_c = 0.8
-            if flag.dataset == 't-ecd-small-r':
+            if flag.dataset == 't-ecd-small-short-m' or flag.dataset == 't-ecd-small-long-m':
                 opt_scale = 0.1
                 opt_add = 0.0
                 # opt_epsilon = 0.5
                 # opt_c = 0.9
+            if flag.dataset == 't-ecd-small-short-r' or flag.dataset == 't-ecd-small-long-r':
+                opt_scale = 0.1
+                opt_add = 0.0
+                # opt_epsilon = 0.5
+                # opt_c = 0.9
+            else:
+                opt_scale = 0.5
+                opt_add = 0.25
 
             # start_scales, end_scales = 0.1, 0.9
             # start_adds, end_adds = 0, 1
@@ -280,17 +300,18 @@ def main(flag=flag):
                 phi = 0.1
                 flag.rel_thresh = 0.6
 
-            if flag.dataset == "t-ecd-small-m":
+            if flag.dataset == 't-ecd-small-short-m' or flag.dataset == 't-ecd-small-long-m':
                 flag.thres = 0.5 # 0.1
                 opt_c = 0.9
                 lr = 0.001
                 cap = 0.3
                 rf = 0.005
                 itr = 150e6
-                phi = 0.3
+                phi = 0.1
                 flag.rel_thresh = 0.6
+                beta = 10
             
-            if flag.dataset == "t-ecd-small-r":
+            if flag.dataset == 't-ecd-small-short-r' or flag.dataset == 't-ecd-small-long-r':
                 flag.thres = 0.5 # 0.1
                 opt_c = 0.9
                 lr = 0.001
@@ -299,6 +320,7 @@ def main(flag=flag):
                 itr = 500e6
                 phi = 0.3
                 flag.rel_thresh = 0.7
+                beta = 10
 
             if flag.dataset == "ml":
                 opt_c = 0.2
@@ -330,6 +352,10 @@ def main(flag=flag):
         if flag.rec_type == "orig":
             recommender = DLMF(num_users, num_items, capping_T = cap, 
                             capping_C = cap, learn_rate = lr, reg_factor = rf)
+            
+        if flag.rec_type == "rel":
+            recommender = DLMF(num_users, num_items, capping_T = cap, 
+                            capping_C = cap, learn_rate = lr, reg_factor = rf, use_relevance=True, coeff_beta=beta)
         
         elif flag.rec_type == "mod":
             recommender = DLMF_Mod(num_users, num_items, capping_T = cap, 
@@ -343,7 +369,7 @@ def main(flag=flag):
             recommender = GradientBoostingClassifier(learning_rate = lr, random_state = 42)
         
         if flag.rec_train:
-            if flag.rec_type == "orig":
+            if flag.rec_type == "orig" or flag.rec_type == "rel":
                 if flag.continue_rec_train:
                     with open(plotpath + flag.rec_add + str(num_run) + "_" + "dlmf_weights.pkl", "rb") as f:
                         saved_state = pickle.load(f)
@@ -355,14 +381,14 @@ def main(flag=flag):
                     with open(plotpath + flag.rec_add + str(num_run) + "_" + "dlmf_mod_weights.pkl", "rb") as f:
                         saved_state = pickle.load(f)
                     recommender.__dict__.update(saved_state)
-                    print("DLMF continued training started!")
+                    print("DLMF_Mod continued training started!")
                 recommender.train(train_df, plotpath + flag.rec_add, num_run, phi, iter=itr)
             elif flag.rec_type == "dr":
                 if flag.continue_rec_train:
                     with open(plotpath + flag.rec_add + str(num_run) + "_" + "dlmf_dr_weights.pkl", "rb") as f:
                         saved_state = pickle.load(f)
                     recommender.__dict__.update(saved_state)
-                    print("DLMF continued training started!")
+                    print("DLMF_DR continued training started!")
                 recommender.train(train_df, plotpath + flag.rec_add, iter=itr)
             elif flag.rec_type == "gbc":
                 popularity = train_df[train_df.outcome>0]["idx_item"].value_counts().reset_index()
@@ -376,7 +402,7 @@ def main(flag=flag):
                                 train_df['outcome'])
         
         else:
-            if flag.rec_type == "orig":
+            if flag.rec_type == "orig" or flag.rec_type == "rel":
                 with open(plotpath + flag.rec_add + str(num_run) + "_" + "dlmf_weights.pkl", "rb") as f:
                     saved_state = pickle.load(f)
                 recommender.__dict__.update(saved_state)
@@ -469,7 +495,7 @@ def main(flag=flag):
         rcau_tmp_list_pers_pop = []
 
         if flag.dataset[-1] == 'd' or flag.dataset[-1] == 'p' \
-            or flag.dataset == "t-ecd-small-m" or flag.dataset == "t-ecd-small-r":
+            or "t-ecd-small" in flag.dataset:
             for t in range(num_times):
                 test_df_t = test_df[test_df["idx_time"] == t]
                 p_pred_test, r_pred_test = predict_batches(
@@ -988,6 +1014,7 @@ def main(flag=flag):
         if flag.dataset != "f":
             print("Models used: Propcare - ", flag.prop_type, ", Recommender - ", flag.rec_type, file=f)
             # print(f"Phi: {phi_t}, Threshold: {th}", file=f)
+            # print(f"Beta used: {b}", file=f)
             print("CP10S:", np.mean(cp10list_pred), np.std(cp10list_pred), file=f)
             if flag.dataset != "ml" or flag.rec_type != "gbc":
                 print("CP10SF:", np.mean(cp10list_pred_freq), np.std(cp10list_pred_freq), file=f)

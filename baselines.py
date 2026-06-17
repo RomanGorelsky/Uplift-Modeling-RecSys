@@ -543,8 +543,6 @@ class DLMF2(Recommender): # This version consider a scale factor alpha
         # pred = 1 / (1 + np.exp(-pred))
         return pred
 
-
-
 class DLMF(Recommender):
     def __init__(self, num_users, num_items,
                  metric='AR_logi', capping_T=0.01, capping_C=0.01,
@@ -556,13 +554,17 @@ class DLMF(Recommender):
                  colname_user='idx_user', colname_item='idx_item',
                  colname_outcome='outcome', colname_prediction='pred',
                  colname_treatment='treated', colname_propensity='propensity', 
-                 colname_frequency = 'frequency'):
+                 colname_relevance = 'relevance_estimate', use_relevance = False,
+                 coeff_beta = 1, colname_frequency = 'frequency'):
         super().__init__(num_users=num_users, num_items=num_items,
                          colname_user=colname_user, colname_item=colname_item,
                          colname_outcome=colname_outcome, colname_prediction=colname_prediction,
                          colname_treatment=colname_treatment, colname_propensity=colname_propensity, 
                          colname_frequency = colname_frequency)
         
+        self.colname_relevance = colname_relevance
+        self.coeff_beta = coeff_beta
+        self.use_relevance = use_relevance
         self.metric = metric
         self.capping_T = capping_T
         self.capping_C = capping_C
@@ -699,9 +701,15 @@ class DLMF(Recommender):
     def predict(self, df):
         users = df[self.colname_user].values
         items = df[self.colname_item].values
+        if self.use_relevance:
+            relevances = df[self.colname_relevance].values
         pred = np.zeros(len(df))
         for n in np.arange(len(df)):
-            pred[n] = np.inner(self.user_factors[users[n], :], self.item_factors[items[n], :])
+            if self.use_relevance:
+                pred[n] = np.inner(self.user_factors[users[n], :], 
+                                   self.item_factors[items[n], :] + self.coeff_beta * relevances[n])
+            else:
+                pred[n] = np.inner(self.user_factors[users[n], :], self.item_factors[items[n], :])
             if self.with_bias:
                 pred[n] += self.item_biases[items[n]]
                 pred[n] += self.user_biases[users[n]]
@@ -713,9 +721,15 @@ class DLMF(Recommender):
         users = df[self.colname_user].values
         items = df[self.colname_item].values
         frequencies = df[self.colname_frequency].values
+        if self.use_relevance:
+            relevances = df[self.colname_relevance].values
         pred = np.zeros(len(df))
         for n in np.arange(len(df)):
-            pred[n] = np.inner(self.user_factors[users[n], :], self.item_factors[items[n], :]) + frequencies[n]
+            if self.use_relevance:
+                pred[n] = np.inner(self.user_factors[users[n], :], 
+                                   self.item_factors[items[n], :] + self.coeff_beta * relevances[n]) + frequencies[n]
+            else:
+                pred[n] = np.inner(self.user_factors[users[n], :], self.item_factors[items[n], :]) + frequencies[n]
             if self.with_bias:
                 pred[n] += self.item_biases[items[n]]
                 pred[n] += self.user_biases[users[n]]
@@ -727,9 +741,15 @@ class DLMF(Recommender):
         users = df[self.colname_user].values
         items = df[self.colname_item].values
         frequencies = df[self.colname_frequency].values
+        if self.use_relevance:
+            relevances = df[self.colname_relevance].values
         pred = np.zeros(len(df))
         for n in np.arange(len(df)):
-            pred[n] = np.inner(self.user_factors[users[n], :] + frequencies[n], self.item_factors[items[n], :])
+            if self.use_relevance:
+                pred[n] = np.inner(self.user_factors[users[n], :] + frequencies[n], 
+                                   self.item_factors[items[n], :] + self.coeff_beta * relevances[n])
+            else:
+                pred[n] = np.inner(self.user_factors[users[n], :] + frequencies[n], self.item_factors[items[n], :])
             if self.with_bias:
                 pred[n] += self.item_biases[items[n]]
                 pred[n] += self.user_biases[users[n]]
@@ -741,9 +761,15 @@ class DLMF(Recommender):
         users = df[self.colname_user].values
         items = df[self.colname_item].values
         frequencies = df[self.colname_frequency].values
+        if self.use_relevance:
+            relevances = df[self.colname_relevance].values
         pred = np.zeros(len(df))
         for n in np.arange(len(df)):
-            pred[n] = np.inner(self.user_factors[users[n], :], self.item_factors[items[n], :] + frequencies[n])
+            if self.use_relevance:
+                pred[n] = np.inner(self.user_factors[users[n], :], 
+                                   self.item_factors[items[n], :] + self.coeff_beta * relevances[n] + frequencies[n])
+            else:
+                pred[n] = np.inner(self.user_factors[users[n], :], self.item_factors[items[n], :] + frequencies[n])
             if self.with_bias:
                 pred[n] += self.item_biases[items[n]]
                 pred[n] += self.user_biases[users[n]]
@@ -1004,58 +1030,6 @@ class DLMF_Mod(Recommender):
                 pred[n] += self.global_bias
 
         return pred
-    
-class DR_Estimator:
-    def __init__(self, num_users, num_items,
-                 dim_factor=64, learn_rate=0.01, reg_factor=0.01, with_bias=True,
-                 colname_user='idx_user', colname_item='idx_item',
-                 colname_outcome='outcome', colname_treatment='treated',
-                 colname_propensity='propensity'):
-
-        self.num_users = num_users
-        self.num_items = num_items
-        self.dim_factor = dim_factor
-        self.learn_rate = learn_rate
-        self.reg_factor = reg_factor
-        self.with_bias = with_bias
-
-        self.colname_user = colname_user
-        self.colname_item = colname_item
-        self.colname_outcome = colname_outcome
-        self.colname_treatment = colname_treatment
-        self.colname_propensity = colname_propensity
-
-        self.model_T = MF(num_users, num_items, dim_factor=dim_factor,
-                          learn_rate=learn_rate, reg_factor=reg_factor, with_bias=with_bias,
-                          colname_user=colname_user, colname_item=colname_item,
-                          colname_outcome=colname_outcome, colname_treatment=colname_treatment,
-                          colname_propensity=colname_propensity)
-
-        self.model_C = MF(num_users, num_items, dim_factor=dim_factor,
-                          learn_rate=learn_rate, reg_factor=reg_factor, with_bias=with_bias,
-                          colname_user=colname_user, colname_item=colname_item,
-                          colname_outcome=colname_outcome, colname_treatment=colname_treatment,
-                          colname_propensity=colname_propensity)
-
-    def train(self, df, iter=10):
-        df_T = df[df[self.colname_treatment] == 1].copy()
-        df_C = df[df[self.colname_treatment] == 0].copy()
-
-        self.model_T.train(df_T, iter=iter)
-        self.model_C.train(df_C, iter=iter)
-
-    def compute_DR(self, df):
-        Z = df[self.colname_treatment].values
-        Y = df[self.colname_outcome].values
-        P = df[self.colname_propensity].values
-
-        y_T_hat = self.model_T.predict(df)
-        y_C_hat = self.model_C.predict(df)
-
-        term_T = Z * (Y - y_T_hat) / np.clip(P, 1e-3, 1) + y_T_hat
-        term_C = (1 - Z) * (Y - y_C_hat) / np.clip(1 - P, 1e-3, 1) + y_C_hat
-
-        return term_T - term_C
     
 class DLMF_DR(Recommender):
     def __init__(self, num_users, num_items,

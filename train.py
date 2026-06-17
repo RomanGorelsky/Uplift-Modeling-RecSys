@@ -113,7 +113,7 @@ def preprocess_data(datapath, dataset):
         test_df["idx_time"] = 0
         return train_df, None, test_df, num_users, num_items, num_times
 
-    elif dataset == 't-ecd-small-m' or dataset == 't-ecd-small-r':
+    elif dataset == 't-ecd-small-short-m' or dataset == 't-ecd-small-short-r':
         train_data = datapath / "data_train.csv"
         vali_data = datapath / "data_vali.csv"
         test_data = datapath / "data_test.csv"
@@ -128,6 +128,34 @@ def preprocess_data(datapath, dataset):
         item_ids = np.sort(
             pd.concat([train_df["idx_item"], vali_df["idx_item"], test_df["idx_item"]]).unique().tolist())
         item2item_encoded = {x: i for i, x in enumerate(item_ids)}
+        train_df["idx_user"] = train_df["idx_user"].map(user2user_encoded)
+        train_df["idx_item"] = train_df["idx_item"].map(item2item_encoded)
+        vali_df["idx_user"] = vali_df["idx_user"].map(user2user_encoded)
+        vali_df["idx_item"] = vali_df["idx_item"].map(item2item_encoded)
+        test_df["idx_user"] = test_df["idx_user"].map(user2user_encoded)
+        test_df["idx_item"] = test_df["idx_item"].map(item2item_encoded)
+        num_users = len(user_ids)
+        num_items = len(item_ids)
+        num_times = len(train_df["idx_time"].unique().tolist())
+        train_df = train_df[["idx_user", "idx_item", "outcome", "idx_time", "propensity", "treated", "personal_popular"]]
+        return train_df, vali_df, test_df, num_users, num_items, num_times
+    
+    elif dataset == 't-ecd-small-long-m' or dataset == 't-ecd-small-long-r':
+        train_data = datapath / "data_train.csv"
+        vali_data = datapath / "data_vali.csv"
+        test_data = datapath / "data_test_big.csv"
+
+        train_df = pd.read_csv(train_data)
+        vali_df = pd.read_csv(vali_data)
+        test_df = pd.read_csv(test_data)
+
+        user_ids = np.sort(
+            pd.concat([train_df["idx_user"], vali_df["idx_user"], test_df["idx_user"]]).unique().tolist())
+        user2user_encoded = {x: i for i, x in enumerate(user_ids)}
+        item_ids = np.sort(
+            pd.concat([train_df["idx_item"], vali_df["idx_item"], test_df["idx_item"]]).unique().tolist())
+        item2item_encoded = {x: i for i, x in enumerate(item_ids)}
+
         train_df["idx_user"] = train_df["idx_user"].map(user2user_encoded)
         train_df["idx_item"] = train_df["idx_item"].map(item2item_encoded)
         vali_df["idx_user"] = vali_df["idx_user"].map(user2user_encoded)
@@ -182,12 +210,20 @@ def prepare_data(flag):
         print("Finn-no is used")
         data_path = Path("./CausalNBR/data/finn-no/real_data.csv")
         train_df, vali_df, test_df, num_users, num_items, num_times = preprocess_data(data_path, dataset)
-    elif flag.dataset == "t-ecd-small-m":
-        print("T-ECD Small Marketplace is used")
+    elif flag.dataset == "t-ecd-small-short-m":
+        print("T-ECD Small Short Marketplace is used")
         data_path = Path("./CausalNBR/data/t_ecd_small/marketplace")
         train_df, vali_df, test_df, num_users, num_items, num_times = preprocess_data(data_path, dataset)
-    elif flag.dataset == "t-ecd-small-r":
-        print("T-ECD Small Retail is used")
+    elif flag.dataset == "t-ecd-small-short-r":
+        print("T-ECD Small Short Retail is used")
+        data_path = Path("./CausalNBR/data/t_ecd_small/retail")
+        train_df, vali_df, test_df, num_users, num_items, num_times = preprocess_data(data_path, dataset)
+    elif flag.dataset == "t-ecd-small-long-m":
+        print("T-ECD Small Long Marketplace is used")
+        data_path = Path("./CausalNBR/data/t_ecd_small/marketplace")
+        train_df, vali_df, test_df, num_users, num_items, num_times = preprocess_data(data_path, dataset)
+    elif flag.dataset == "t-ecd-small-long-r":
+        print("T-ECD Small Long Retail is used")
         data_path = Path("./CausalNBR/data/t_ecd_small/retail")
         train_df, vali_df, test_df, num_users, num_items, num_times = preprocess_data(data_path, dataset)
     
@@ -211,7 +247,7 @@ def train_propensity(train_df, vali_df, flag, num_users, num_items, popular, num
     else:
         epochs = 10
 
-    if flag.prop_train and num_run != 0:
+    if flag.prop_train:
         optim_val_car = 0
         # train_df = train_df[train_df["outcome"] > 0]
         # for epoch in range(flag.epoch):
